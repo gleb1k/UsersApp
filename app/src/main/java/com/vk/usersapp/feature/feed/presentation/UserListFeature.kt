@@ -1,11 +1,10 @@
 package com.vk.usersapp.feature.feed.presentation
 
 import androidx.lifecycle.viewModelScope
-import com.vk.usersapp.core.BaseViewModel
-import com.vk.usersapp.core.MVIFeature
-import com.vk.usersapp.feature.feed.api.UsersRepositoryImpl
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
+import com.vk.usersapp.core.mvi.BaseViewModel
+import com.vk.usersapp.core.mvi.MVIFeature
+import com.vk.usersapp.core.utils.CoroutineDispatchers
+import com.vk.usersapp.feature.feed.api.UsersRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -31,10 +30,9 @@ import kotlinx.coroutines.withContext
 //          |-------- Feature
 
 class UserListFeature(
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
-    private val reducer: UserListReducer = UserListReducer(),
-    private val usersRepositoryImpl: UsersRepositoryImpl = UsersRepositoryImpl()
+    private val dispatchers: CoroutineDispatchers,
+    private val reducer: UserListReducer,
+    private val usersRepository: UsersRepository
 ) : MVIFeature, BaseViewModel() {
 
     private val mutableViewStateFlow =
@@ -57,7 +55,7 @@ class UserListFeature(
             .map { it.trim() }
             .distinctUntilChanged()
             .debounce(SEARCH_DEBOUNCE)
-            .flowOn(defaultDispatcher)
+            .flowOn(dispatchers.default)
             .mapLatest(::searchUsersInternal)
             .launchIn(viewModelScope)
     }
@@ -95,8 +93,8 @@ class UserListFeature(
     private fun getAllUsers() {
         viewModelScope.launchSafe {
             submitAction(UserListAction.Loading(true))
-            val users = withContext(ioDispatcher) {
-                usersRepositoryImpl.getUsers()
+            val users = withContext(dispatchers.io) {
+                usersRepository.getUsers()
             }
             submitAction(UserListAction.Users(users))
         }
@@ -109,8 +107,8 @@ class UserListFeature(
     private fun searchUsersInternal(query: String) {
         viewModelScope.launchSafe {
             submitAction(UserListAction.Loading(true))
-            val users = withContext(ioDispatcher) {
-                usersRepositoryImpl.searchUsers(query)
+            val users = withContext(dispatchers.io) {
+                usersRepository.searchUsers(query)
             }
             submitAction(UserListAction.Users(users))
         }

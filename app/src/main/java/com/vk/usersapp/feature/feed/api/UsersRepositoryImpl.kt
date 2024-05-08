@@ -1,10 +1,10 @@
 package com.vk.usersapp.feature.feed.api
 
-import com.vk.usersapp.core.Retrofit
+import com.vk.usersapp.core.network.NetworkFactory
 import com.vk.usersapp.feature.feed.model.User
 
 class UsersRepositoryImpl(
-    private val api: UsersApi = Retrofit.getClient().create(UsersApi::class.java)
+    private val api: UsersApi
 ) : UsersRepository {
 
     override suspend fun getUsers(): List<User> {

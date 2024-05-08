@@ -1,6 +1,7 @@
 package com.vk.usersapp.presentation
 
 import com.vk.usersapp.MainDispatcherRule
+import com.vk.usersapp.core.utils.di.CoroutineDispatchersComponentHolder
 import com.vk.usersapp.feature.feed.api.UsersRepositoryImpl
 import com.vk.usersapp.feature.feed.model.User
 import com.vk.usersapp.feature.feed.presentation.UserListAction
@@ -33,10 +34,10 @@ class UserListFeatureTest {
     fun setUp() {
         MockKAnnotations.init(this)
         userListFeature = UserListFeature(
-            ioDispatcher = UnconfinedTestDispatcher(),
-            defaultDispatcher = UnconfinedTestDispatcher(),
+            //todo testDispatchers
+            dispatchers = CoroutineDispatchersComponentHolder.get().dispatchers,
             reducer = UserListReducer(),
-            usersRepositoryImpl = usersRepositoryImpl
+            usersRepository = usersRepositoryImpl
         )
     }
 
@@ -50,6 +51,8 @@ class UserListFeatureTest {
                 (userListFeature.viewStateFlow.value as UserListViewState.List).itemsList
             assertEquals(expectedData, actualData)
         }
+
+        //не писал тесты для вьюмоделей(
     }
 
     @Test

@@ -15,7 +15,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.RecyclerView
 import com.vk.usersapp.R
-import com.vk.usersapp.core.ViewModelProvider
+import com.vk.usersapp.core.mvi.ViewModelProvider
+import com.vk.usersapp.feature.feed.di.UserUiComponentHolder
 import com.vk.usersapp.feature.feed.presentation.UserListAction
 import com.vk.usersapp.feature.feed.presentation.UserListFeature
 import com.vk.usersapp.feature.feed.presentation.UserListViewState
@@ -29,7 +30,11 @@ class UserListFragment : Fragment() {
     private var errorView: TextView? = null
     private var loaderView: ProgressBar? = null
 
-    val feature: UserListFeature by lazy { ViewModelProvider.obtainFeature { UserListFeature() } }
+    val feature: UserListFeature by lazy {
+        ViewModelProvider.obtainFeature {
+            UserUiComponentHolder.get().userListFeature2()
+        }
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,

@@ -11,12 +11,12 @@ import com.vk.usersapp.feature.feed.model.User
 class UserListItemVh(view: View) : RecyclerView.ViewHolder(view) {
 
     private val avatar: ImageView = view.findViewById(R.id.photo)
-    private val title: TextView = view.findViewById(R.id.title)
-    private val subtitle: TextView = view.findViewById(R.id.subtitle)
+    private val title: TextView = view.findViewById(R.id.name_and_age)
+    private val subtitle: TextView = view.findViewById(R.id.university)
 
     fun bind(user: User) {
         Glide.with(avatar).load(user.image).into(avatar)
-        title.text = "${user.firstName} ${user.lastName}"
+        title.text = "${user.firstName} ${user.lastName}, ${user.age}"
         subtitle.text = user.university
     }
 }

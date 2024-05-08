@@ -3,7 +3,7 @@ package com.vk.usersapp.feature.feed.presentation
 import androidx.lifecycle.viewModelScope
 import com.vk.usersapp.core.BaseViewModel
 import com.vk.usersapp.core.MVIFeature
-import com.vk.usersapp.feature.feed.api.UsersRepository
+import com.vk.usersapp.feature.feed.api.UsersRepositoryImpl
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -34,7 +34,7 @@ class UserListFeature(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val reducer: UserListReducer = UserListReducer(),
-    private val usersRepository: UsersRepository = UsersRepository()
+    private val usersRepositoryImpl: UsersRepositoryImpl = UsersRepositoryImpl()
 ) : MVIFeature, BaseViewModel() {
 
     private val mutableViewStateFlow =
@@ -96,7 +96,7 @@ class UserListFeature(
         viewModelScope.launchSafe {
             submitAction(UserListAction.Loading(true))
             val users = withContext(ioDispatcher) {
-                usersRepository.getUsers()
+                usersRepositoryImpl.getUsers()
             }
             submitAction(UserListAction.Users(users))
         }
@@ -110,7 +110,7 @@ class UserListFeature(
         viewModelScope.launchSafe {
             submitAction(UserListAction.Loading(true))
             val users = withContext(ioDispatcher) {
-                usersRepository.searchUsers(query)
+                usersRepositoryImpl.searchUsers(query)
             }
             submitAction(UserListAction.Users(users))
         }

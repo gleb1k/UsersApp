@@ -1,4 +1,4 @@
-package com.vk.usersapp.core
+package com.vk.usersapp.core.mvi
 
 object ViewModelProvider {
 

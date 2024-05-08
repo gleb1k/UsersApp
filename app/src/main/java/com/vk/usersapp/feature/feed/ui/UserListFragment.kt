@@ -8,64 +8,67 @@ import android.widget.EditText
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.core.view.isVisible
-import androidx.core.widget.doAfterTextChanged
+import androidx.core.widget.addTextChangedListener
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.vk.usersapp.R
-import com.vk.usersapp.core.ViewModelProvider
-import com.vk.usersapp.core.asFlow
+import com.vk.usersapp.core.mvi.ViewModelProvider
+import com.vk.usersapp.feature.feed.di.UserUiComponentHolder
 import com.vk.usersapp.feature.feed.presentation.UserListAction
 import com.vk.usersapp.feature.feed.presentation.UserListFeature
 import com.vk.usersapp.feature.feed.presentation.UserListViewState
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 class UserListFragment : Fragment() {
 
-    val adapter: UserListAdapter by lazy { UserListAdapter() }
-    var recycler: RecyclerView? = null
-    var queryView: EditText? = null
-    var errorView: TextView? = null
-    var loaderView: ProgressBar? = null
+    private val adapter: UserListAdapter by lazy { UserListAdapter() }
+    private var recycler: RecyclerView? = null
+    private var queryView: EditText? = null
+    private var errorView: TextView? = null
+    private var loaderView: ProgressBar? = null
 
-    var feature: UserListFeature? = null
+    val feature: UserListFeature by lazy {
+        ViewModelProvider.obtainFeature {
+            UserUiComponentHolder.get().userListFeature2()
+        }
+    }
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
-        return LayoutInflater.from(requireContext()).inflate(R.layout.fr_user_list, container, false)
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        return inflater.inflate(R.layout.fr_user_list, container, false).apply {
+            recycler = findViewById(R.id.recycler)
+            recycler?.adapter = adapter
+            queryView = findViewById(R.id.search_input)
+            errorView = findViewById(R.id.error)
+            loaderView = findViewById(R.id.loader)
+        }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        recycler = view.findViewById(R.id.recycler)
-        queryView = view.findViewById(R.id.search_input)
-        errorView = view.findViewById(R.id.error)
-        loaderView = view.findViewById(R.id.loader)
-        recycler?.adapter = adapter
-        recycler?.layoutManager = LinearLayoutManager(view.context)
 
-        feature = ViewModelProvider.obtainFeature {
-            UserListFeature()
+        queryView?.addTextChangedListener {
+            it?.let {
+                feature.submitAction(UserListAction.QueryChanged(it.toString()))
+            }
         }
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                feature?.viewStateFlow?.collect {
+                feature.viewStateFlow.collect {
                     renderState(it)
-                }
-                queryView?.asFlow()?.collect {
-                    feature?.submitAction(UserListAction.QueryChanged(it))
                 }
             }
         }
-
-        feature?.submitAction(UserListAction.Init)
     }
 
     override fun onDestroy() {
-        feature?.let {
+        feature.let {
             if (activity?.isFinishing == true) {
                 ViewModelProvider.destroyFeature(it.javaClass)
             }
@@ -81,6 +84,7 @@ class UserListFragment : Fragment() {
                 loaderView?.isVisible = false
                 recycler?.isVisible = false
             }
+
             is UserListViewState.List -> {
                 loaderView?.isVisible = false
                 if (viewState.itemsList.isEmpty()) {
@@ -93,6 +97,7 @@ class UserListFragment : Fragment() {
                     adapter.setUsers(viewState.itemsList)
                 }
             }
+
             UserListViewState.Loading -> {
                 errorView?.isVisible = false
                 loaderView?.isVisible = true

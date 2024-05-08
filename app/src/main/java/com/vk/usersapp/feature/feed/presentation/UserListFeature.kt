@@ -1,15 +1,22 @@
 package com.vk.usersapp.feature.feed.presentation
 
-import android.util.Log
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.vk.usersapp.core.MVIFeature
+import com.vk.usersapp.core.mvi.BaseViewModel
+import com.vk.usersapp.core.mvi.MVIFeature
+import com.vk.usersapp.core.utils.CoroutineDispatchers
 import com.vk.usersapp.feature.feed.api.UsersRepository
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.withContext
 
 // MVI:
@@ -22,14 +29,36 @@ import kotlinx.coroutines.withContext
 //          |            v
 //          |-------- Feature
 
-class UserListFeature : MVIFeature, ViewModel() {
-    private val mutableViewStateFlow = MutableStateFlow<UserListViewState>(UserListViewState.Loading)
-    val viewStateFlow: StateFlow<UserListViewState> = mutableViewStateFlow.asStateFlow()
+class UserListFeature(
+    private val dispatchers: CoroutineDispatchers,
+    private val reducer: UserListReducer,
+    private val usersRepository: UsersRepository
+) : MVIFeature, BaseViewModel() {
+
+    private val mutableViewStateFlow =
+        MutableStateFlow<UserListViewState>(UserListViewState.Loading)
+    val viewStateFlow: StateFlow<UserListViewState>
+        get() = mutableViewStateFlow.asStateFlow()
 
     private var state: UserListState = UserListState()
 
-    private val reducer = UserListReducer()
-    private val usersRepository = UsersRepository()
+    private val searchQueryPublisher = MutableSharedFlow<String>(extraBufferCapacity = 1)
+
+    init {
+        listenToSearchQuery()
+        submitAction(UserListAction.Init)
+    }
+
+    @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
+    private fun listenToSearchQuery() {
+        searchQueryPublisher
+            .map { it.trim() }
+            .distinctUntilChanged()
+            .debounce(SEARCH_DEBOUNCE)
+            .flowOn(dispatchers.default)
+            .mapLatest(::searchUsersInternal)
+            .launchIn(viewModelScope)
+    }
 
     fun submitAction(action: UserListAction) {
         state = reducer.applyAction(action, state)
@@ -38,10 +67,11 @@ class UserListFeature : MVIFeature, ViewModel() {
         mutableViewStateFlow.value = viewState
 
         when (action) {
-            UserListAction.Init,
-            is UserListAction.QueryChanged -> submitSideEffect(UserListSideEffect.LoadUsers(state.query))
-            is UserListAction.UsersLoaded,
-            is UserListAction.LoadError -> Unit
+            UserListAction.Init -> submitSideEffect(UserListSideEffect.LoadAllUsers)
+            is UserListAction.QueryChanged -> sendQueryToSearchPublisher(query = action.query)
+            is UserListAction.Users -> Unit
+            is UserListAction.Error -> Unit
+            is UserListAction.Loading -> Unit
         }
     }
 
@@ -55,25 +85,41 @@ class UserListFeature : MVIFeature, ViewModel() {
 
     private fun submitSideEffect(sideEffect: UserListSideEffect) {
         when (sideEffect) {
-            is UserListSideEffect.LoadUsers -> loadUsers(sideEffect.query)
+            is UserListSideEffect.LoadAllUsers -> getAllUsers()
+            is UserListSideEffect.SearchUsers -> searchUsersInternal(sideEffect.query)
         }
     }
 
-    private fun loadUsers(query: String) {
-        viewModelScope.launch {
-            try {
-                val users = withContext(Dispatchers.IO) {
-                    if (query.isBlank()) {
-                        usersRepository.getUsers()
-                    } else {
-                        usersRepository.searchUsers(query)
-                    }
-                }
-                submitAction(UserListAction.UsersLoaded(users))
-            } catch (e: Exception) {
-                Log.e("DIMAA", e.toString())
-                submitAction(UserListAction.LoadError(e.message ?: "FATAL"))
+    private fun getAllUsers() {
+        viewModelScope.launchSafe {
+            submitAction(UserListAction.Loading(true))
+            val users = withContext(dispatchers.io) {
+                usersRepository.getUsers()
             }
+            submitAction(UserListAction.Users(users))
         }
+    }
+
+    private fun sendQueryToSearchPublisher(query: String) {
+        searchQueryPublisher.tryEmit(query)
+    }
+
+    private fun searchUsersInternal(query: String) {
+        viewModelScope.launchSafe {
+            submitAction(UserListAction.Loading(true))
+            val users = withContext(dispatchers.io) {
+                usersRepository.searchUsers(query)
+            }
+            submitAction(UserListAction.Users(users))
+        }
+    }
+
+    override fun onException(exception: Throwable) {
+        submitAction(UserListAction.Error(exception.message ?: "FATAL"))
+        super.onException(exception)
+    }
+
+    companion object {
+        private const val SEARCH_DEBOUNCE = 500L
     }
 }
